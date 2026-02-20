@@ -1,44 +1,65 @@
 package com.example.whyamihere.Model
 
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.Calendar
 
-class UsageStatsRepository(private val context: Context){
+class UsageStatsRepository(private val context: Context) {
+
     @RequiresApi(Build.VERSION_CODES.Q)
-    fun getLast24HoursUsage():List<AppUsage>{
-        val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTime = System.currentTimeMillis()
-        val startTime = endTime - (24 * 60 * 60 * 1000)
+    fun getTodayUsage(): List<AppUsage> {
 
-        val stats = usageStatsManager.queryUsageStats(
+        val usageStatsManager =
+            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+
+        val startTime = LocalDate.now()
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val endTime = System.currentTimeMillis()
+
+        val statsList = usageStatsManager.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY,
-            startTime,endTime
+            startTime,
+            endTime
         )
 
-        val pm: PackageManager = context.packageManager //Database of Apps
+        val pm = context.packageManager
         val result = mutableListOf<AppUsage>()
 
-        for( usage in stats){
-            if(usage.totalTimeInForeground>0) {
+        statsList?.forEach { usageStats ->
+
+            val timeUsed = usageStats.totalTimeInForeground
+
+            if (timeUsed > 0) {
                 try {
-                    val appInfo = pm.getApplicationInfo(usage.packageName, 0)
+                    val appInfo = pm.getApplicationInfo(usageStats.packageName, 0)
                     val appName = pm.getApplicationLabel(appInfo).toString()
+
                     result.add(
                         AppUsage(
                             appName = appName,
-                            packageName = usage.packageName,
-                            timeUsed = usage.totalTimeInForeground
+                            timeUsed = timeUsed
                         )
                     )
                 } catch (e: Exception) {
-                    //Log.d(e.toString(),usage.packageName)
+                    // ignore system apps not resolvable
                 }
             }
         }
-        return result
+
+        return result.sortedByDescending { it.timeUsed }
     }
+
+
+
 }
