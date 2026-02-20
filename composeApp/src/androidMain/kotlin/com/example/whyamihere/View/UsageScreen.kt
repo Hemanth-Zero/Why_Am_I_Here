@@ -37,3 +37,25 @@ fun UsageScreen(
         }
     }
 }
+
+@Composable
+fun UsageItem(app: AppUsage) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(text = app.appName)
+            Text(text = formatTime(app.timeUsed))
+        }
+    }
+}
+
+fun formatTime(timeMillis: Long): String {
+    val minutes = timeMillis / 60000
+    return "$minutes min"
+}
