@@ -74,7 +74,7 @@ fun HomeScreen( listofapp : List<AppUsage> ,
                 }
 
             }
-            //UsageScreen(sortedList)
+            UsageScreen(sortedList)
         }
     }
 }
@@ -219,7 +219,7 @@ fun UsageItem(app: AppUsage) {
         Column(
             modifier = Modifier.weight(1f)
         ) {
-            Text(text = app.appName)
+            Text(text = app.packageName)
             Text(text = formatTime(app.timeUsed))
         }
     }
