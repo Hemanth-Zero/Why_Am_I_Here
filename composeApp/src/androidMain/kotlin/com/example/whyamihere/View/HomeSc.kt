@@ -1,67 +1,60 @@
 package com.example.whyamiherelab
 
-import android.graphics.Paint
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButtonDefaults.borderStroke
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ModifierLocalBeyondBoundsLayout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.compose.AppTheme
 import com.example.whyamihere.Model.AppUsage
-import com.example.whyamihere.View.UsageScreen
+import com.example.whyamihere.View.AppBottomBar
+import com.example.whyamihere.View.Screens
+import kotlinx.coroutines.delay
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 
-fun HomeScreen( listofapp : List<AppUsage>){
+fun HomeScreen( listofapp : List<AppUsage> ,
+                Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit
+                ){
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(text = "HomeScreen") },
             ) },
         bottomBar = {
-            BottomAppBar() {
-                Switch(
-                    checked = true,
-                    onCheckedChange = {}
-                )
-            }
+            AppBottomBar(Sc1, Sc2 = Sc2, Sc3 = Sc3 , selected = Screens.HomeScreen.id)
         }
     ) { paddingValues ->
         var sortedList = listofapp.sortedByDescending { it.timeUsed }
@@ -81,40 +74,51 @@ fun HomeScreen( listofapp : List<AppUsage>){
                 }
 
             }
-            UsageScreen(sortedList)
+            //UsageScreen(sortedList)
         }
     }
 }
 
 @Composable
-fun AppCard(app: AppUsage , i : Int){
-    Card( modifier = Modifier.fillMaxWidth()) {
+fun AppCard(app: AppUsage , i : Int ){
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(i*100L)
+        visible = true
+    }
+    AnimatedVisibility(visible = visible
+    , enter = slideInHorizontally(initialOffsetX = {it})+ fadeIn()
+    ) {
+        Card(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
 
-        Row(modifier = Modifier.fillMaxWidth().padding(10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween) {
-            Row() {
-                Canvas(modifier = Modifier.size(12.dp)) {
-                    drawCircle(
-                        color = when (i) {
-                            0 -> Color.Red
-                            1 -> Color.Yellow
-                            2 -> Color.Green
-                            3 -> Color.Magenta
-                            4 -> Color(0xFFFF9800)
-                            else -> Color.Blue
-                        },
-                        radius = size.minDimension / 2
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row() {
+                    Canvas(modifier = Modifier.size(12.dp)) {
+                        drawCircle(
+                            color = when (i) {
+                                0 -> Color.Red
+                                1 -> Color.Yellow
+                                2 -> Color.Green
+                                3 -> Color.Magenta
+                                4 -> Color(0xFFFF9800)
+                                else -> Color.Blue
+                            },
+                            radius = size.minDimension / 2
+                        )
+                    }
+                    Text(text = app.appName, modifier = Modifier.padding(4.dp))
                 }
-                Text(text = app.appName, modifier = Modifier.padding(4.dp))
-            }
 
-            var apptime=""
-            if(hournMin(app.timeUsed)[0]>0){
-                apptime+=""+hournMin(app.timeUsed)[0]+"hrs"
+                var apptime = ""
+                if (hournMin(app.timeUsed)[0] > 0) {
+                    apptime += "" + hournMin(app.timeUsed)[0] + "hrs"
+                }
+                apptime += " " + hournMin(app.timeUsed)[1] + "mins"
+                Text(text = apptime)
             }
-            apptime+=" "+hournMin(app.timeUsed)[1]+"mins"
-            Text(text = apptime)
         }
     }
 }
@@ -152,6 +156,9 @@ fun MultColorCircularBar(usagedata: List<AppUsage>){
                         if(i == 5){
                             sweptangle = 270f - startangle
                         }
+
+
+
                         drawArc(
                             color = color,
                             startAngle = startangle,
@@ -174,4 +181,51 @@ fun hournMin(time: Long): List<Long>{
     var hour = (time/(1000*60*60))
     var mins = ((time/(1000*60))-hour*60)
     return listOf(hour,mins)
+}
+
+@Composable
+fun UsageScreen(
+    usageList: List<AppUsage>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+
+        Text(
+            text = "App Usage",
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyColumn {
+            items(usageList) { app ->
+                UsageItem(app)
+            }
+        }
+    }
+}
+
+@Composable
+fun UsageItem(app: AppUsage) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(text = app.appName)
+            Text(text = formatTime(app.timeUsed))
+        }
+    }
+}
+
+fun formatTime(timeMillis: Long): String {
+    val minutes = timeMillis / 60000
+    return "$minutes min"
 }

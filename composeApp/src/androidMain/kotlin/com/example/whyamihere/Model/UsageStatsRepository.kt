@@ -1,16 +1,11 @@
 package com.example.whyamihere.Model
 
-import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
-import java.util.Calendar
 
 class UsageStatsRepository(private val context: Context) {
 
@@ -63,3 +58,9 @@ class UsageStatsRepository(private val context: Context) {
 
 
 }
+
+data class AppUsage(
+    val appName: String,
+    val packageName: String = "",
+    val timeUsed: Long
+)
