@@ -6,19 +6,14 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.WindowManager
-import androidx.compose.runtime.*
 import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.*
+import androidx.savedstate.*
 import com.example.compose.AppTheme
+import com.example.whyamihere.AppTimerService
 import com.example.whyamihere.Model.IntentionStore
 import com.example.whyamihere.View.IntentionOverlay
+import kotlin.jvm.java
 
 class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
@@ -34,16 +29,20 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         const val EXTRA_PACKAGE_NAME = "package_name"
         const val EXTRA_APP_NAME = "app_name"
 
+        private var isOverlayShowing = false
+
         fun show(context: Context, packageName: String, appName: String) {
+            if (isOverlayShowing) return
+
             val intent = Intent(context, OverlayService::class.java).apply {
                 putExtra(EXTRA_PACKAGE_NAME, packageName)
                 putExtra(EXTRA_APP_NAME, appName)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startService(intent)
         }
 
         fun dismiss(context: Context) {
+            isOverlayShowing = false
             context.stopService(Intent(context, OverlayService::class.java))
         }
     }
@@ -67,6 +66,9 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     }
 
     private fun showOverlay(packageName: String, appName: String) {
+
+        if (composeView != null) return
+
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
 
         val params = WindowManager.LayoutParams(
@@ -87,14 +89,33 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
                     IntentionOverlay(
                         appName = appName,
                         packageName = packageName,
+
+                        // 🔥 FIXED LOGIC HERE
                         onIntentionSet = { intention ->
-                            IntentionStore.setIntention(this@OverlayService, packageName, intention)
+
+                            // ✅ Handle timed session
+                            if (intention == "timed_session") {
+                                val timerIntent = Intent(
+                                    this@OverlayService,
+                                    AppTimerService::class.java
+                                )
+                                timerIntent.putExtra("TIME", 10 * 60 * 1000L) // 10 mins
+                                startService(timerIntent)
+                            }
+
+                            IntentionStore.setIntention(
+                                this@OverlayService,
+                                packageName,
+                                intention
+                            )
+
                             dismiss(this@OverlayService)
                         },
+
                         onExit = {
                             IntentionStore.clearIntention(this@OverlayService, packageName)
                             dismiss(this@OverlayService)
-                            // Go back to home
+
                             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                                 addCategory(Intent.CATEGORY_HOME)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -107,14 +128,15 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         }
 
         windowManager?.addView(composeView, params)
+        isOverlayShowing = true
     }
 
     override fun onDestroy() {
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-        composeView?.let { windowManager?.removeView(it) }
+        composeView?.let {
+            try { windowManager?.removeView(it) } catch (_: Exception) {}
+        }
         composeView = null
+        isOverlayShowing = false
         super.onDestroy()
     }
 }

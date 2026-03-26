@@ -6,8 +6,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.example.whyamihere.Model.IntentionStore
 import com.example.whyamihere.Model.TrackedAppsPrefs
+import com.example.whyamihere.Model.UsageManager
 import com.example.whyamihere.ViewModel.sendBreakNotification
-import com.example.whyamihere.ViewModel.sendNotification
 
 class AppMonitorService : AccessibilityService() {
 
@@ -19,37 +19,55 @@ class AppMonitorService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
 
-        // Skip system UI and our own app
         if (packageName == "com.android.systemui" ||
             packageName == applicationContext.packageName) return
 
         val isTracked = TrackedAppsPrefs.isTracked(applicationContext, packageName)
 
         if (isTracked) {
+
+            val appName = try {
+                val pm = applicationContext.packageManager
+                pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+            } catch (e: PackageManager.NameNotFoundException) {
+                packageName
+            }
+
+            val usedTime = UsageManager.getTodayUsage(applicationContext, packageName)
+            val limitMinutes = TrackedAppsPrefs.getDailyLimitMinutes(applicationContext, packageName)
+            val limitMillis = limitMinutes * 60 * 1000L
+
             val hasIntention = IntentionStore.hasRecentIntention(applicationContext, packageName)
 
-            if (!hasIntention) {
-                // Show overlay to prompt intention
-                val appName = try {
-                    val pm = applicationContext.packageManager
-                    pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
-                } catch (e: PackageManager.NameNotFoundException) {
-                    packageName
-                }
+            // 🔴 LIMIT EXCEEDED
+            if (limitMillis > 0 && usedTime >= limitMillis) {
+                OverlayService.show(applicationContext, packageName, appName)
 
                 currentTrackedPackage = packageName
                 sessionStartTime = System.currentTimeMillis()
+                return
+            }
 
+            // 🟡 NO INTENTION
+            if (!hasIntention) {
                 OverlayService.show(applicationContext, packageName, appName)
-                Log.d("AppMonitor", "Showing intention overlay for $packageName")
+
+                currentTrackedPackage = packageName
+                sessionStartTime = System.currentTimeMillis()
             } else {
-                // App opened with intention — check break reminder
                 checkBreakReminder(packageName)
             }
+
         } else {
-            // Left a tracked app — clear its intention
             currentTrackedPackage?.let { prevPkg ->
                 if (prevPkg != packageName) {
+
+                    val duration = System.currentTimeMillis() - sessionStartTime
+
+                    if (duration > 0) {
+                        UsageManager.saveUsage(applicationContext, prevPkg, duration)
+                    }
+
                     IntentionStore.clearIntention(applicationContext, prevPkg)
                     currentTrackedPackage = null
                 }
@@ -58,19 +76,22 @@ class AppMonitorService : AccessibilityService() {
     }
 
     private fun checkBreakReminder(packageName: String) {
-        val breakIntervalMs = TrackedAppsPrefs.getBreakReminderMinutes(applicationContext) * 60 * 1000L
+        val breakIntervalMs =
+            TrackedAppsPrefs.getBreakReminderMinutes(applicationContext) * 60 * 1000L
+
         val lastBreak = IntentionStore.getLastBreakTime(applicationContext, packageName)
         val sessionStart = IntentionStore.getSessionStartTime(applicationContext, packageName)
         val reference = if (lastBreak > sessionStart) lastBreak else sessionStart
 
         if (reference > 0 && (System.currentTimeMillis() - reference) >= breakIntervalMs) {
             IntentionStore.updateLastBreakTime(applicationContext, packageName)
+
             val appName = try {
                 val pm = applicationContext.packageManager
                 pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
             } catch (e: Exception) { packageName }
+
             sendBreakNotification(applicationContext, appName)
-            Log.d("AppMonitor", "Break reminder sent for $packageName")
         }
     }
 
