@@ -74,7 +74,7 @@ fun HomeScreen( listofapp : List<AppUsage> ,
                 }
 
             }
-            UsageScreen(sortedList)
+            //UsageScreen(sortedList)
         }
     }
 }

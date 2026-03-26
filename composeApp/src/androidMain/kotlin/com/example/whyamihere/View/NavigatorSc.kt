@@ -8,13 +8,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.week2.TaskScreen
 import com.example.whyamihere.Model.UsageStatsRepository
+import com.example.whyamihere.ViewModel.MyAppViewModel
 import com.example.whyamiherelab.HomeScreen
 
 @RequiresApi(Build.VERSION_CODES.Q)
 @Composable
-fun AppNavi(usageRepository : UsageStatsRepository){
-    val usageList = usageRepository.getTodayUsage()
+fun AppNavi(myAppViewModel: MyAppViewModel){
+    val usageList  = myAppViewModel.getUsageList()
     val navcontroller = rememberNavController()
+
     NavHost(
         navController = navcontroller,
         startDestination = Screens.HomeScreen.name,
@@ -49,7 +51,7 @@ fun AppNavi(usageRepository : UsageStatsRepository){
             HomeScreen(usageList , Sc3 = Sc3 , Sc1 = Sc1 , Sc2 = Sc2)
         }
         composable(route = Screens.ProfileScreen.name) {
-            ProfileScreen(Sc3 = Sc3 , Sc1 = Sc1 , Sc2 = Sc2 , Sc4 = {})
+            ProfileScreen(Sc3 = Sc3 , Sc1 = Sc1 , Sc2 = Sc2 , myAppViewModel = myAppViewModel)
         }
 
     }
