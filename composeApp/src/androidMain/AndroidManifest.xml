@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"/>
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN"/>
@@ -38,6 +38,11 @@
         <service
             android:name=".OverlayService"
             android:exported="false"/>
+
+        <service
+            android:name=".AppTimerService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
 
         <!-- Accessibility service for monitoring app launches -->
         <service
