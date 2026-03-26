@@ -7,3 +7,10 @@ plugins {
     alias(libs.plugins.composeCompiler) apply false
     alias(libs.plugins.kotlinMultiplatform) apply false
 }
+
+buildscript {
+    extra.apply {
+        set("nav_version", "2.8.4")
+        set("room_version", "2.6.1")
+    }
+}

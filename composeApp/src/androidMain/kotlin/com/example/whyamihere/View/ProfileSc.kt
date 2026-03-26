@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,18 +50,75 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.whyamihere.ViewModel.MyAppViewModel
 import kotlinx.coroutines.delay
+
+@Composable
+fun ProfileScreen(Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit ,
+                  myAppViewModel: MyAppViewModel){
+
+
+    val ProfileNavController = rememberNavController()
+    NavHost(
+        navController = ProfileNavController,
+        startDestination = ProfileScreens.Profile.name
+    ){
+        composable(route = ProfileScreens.Profile.name ) {
+                Profile(Sc3 = Sc3 , Sc1 = Sc1 , Sc2 = Sc2
+                    , changeScreen = { id ->
+                        when(id){
+                            0 -> ProfileNavController.navigate(route = ProfileScreens.Settings.name)
+                            1 -> ProfileNavController.navigate(route = ProfileScreens.Statistics.name)
+                            2 -> ProfileNavController.navigate(route = ProfileScreens.TrackedApps.name)
+                            3 -> ProfileNavController.navigate(route = ProfileScreens.Themes.name)
+                            4 -> ProfileNavController.navigate(route = ProfileScreens.About.name)
+                            5 -> ProfileNavController.navigate(route = ProfileScreens.Help.name)
+                            else -> ProfileNavController.navigate(route = ProfileScreens.Profile.name)
+                        }
+                } )
+        }
+        composable(route =  ProfileScreens.Settings.name ) {
+            ErrorScreen()
+        }
+        composable(route =  ProfileScreens.Statistics.name ) {
+            ErrorScreen()
+        }
+        composable(route =  ProfileScreens.TrackedApps.name ) {
+                TrackedAppScreen(myAppViewModel = myAppViewModel)
+        }
+        composable(route =  ProfileScreens.Themes.name ) {
+            ErrorScreen()
+        }
+        composable(route =  ProfileScreens.About.name ) {
+            ErrorScreen()
+        }
+        composable(route =  ProfileScreens.Help.name ) {
+            ErrorScreen()
+        }
+    }
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-
-fun ProfileScreen(Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit , Sc4:()->Unit) {
+fun Profile(Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit , changeScreen:(id:Int) ->Unit ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { TopAppBar(title = { Text(text = "My Profile") }, actions = {}) },
-        bottomBar = { AppBottomBar(Sc1, Sc2 = Sc2, Sc3 = Sc3 , selected = Screens.ProfileScreen.id) },
+        bottomBar = {
+            AppBottomBar(
+                Sc1,
+                Sc2 = Sc2,
+                Sc3 = Sc3,
+                selected = Screens.ProfileScreen.id
+            )
+        },
 
-    ) { paddingValues ->
+        ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -68,6 +126,7 @@ fun ProfileScreen(Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit , Sc4:()->Unit
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
                 var visible by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
                     delay(timeMillis = 0.0001f.toLong())
@@ -86,7 +145,7 @@ fun ProfileScreen(Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit , Sc4:()->Unit
                         phone = "+91 9876543210"
                     )
                 }
-                ProfileBody()
+                ProfileBody(changeScreen = { id -> changeScreen(id) })
 
             }
         }
@@ -174,14 +233,14 @@ fun ProfileCard(
 }
 
 @Composable
-fun ProfileBody() {
-    val items = listOf(
+fun ProfileBody(changeScreen:(id: Int) -> Unit ) {
+    val Menuitems = listOf(
         Triple("Settings", Icons.Default.Settings, 0),
         Triple("Your Statistics", Icons.Default.BarChart, 1),
         Triple("Your Tracked Apps", Icons.Default.Apps, 2),
         Triple("Theme & Preferences", Icons.Default.Palette, 3),
         Triple("About", Icons.Default.Info, 4),
-        Triple("Help", Icons.Default.Help, 5)
+        Triple("Help", Icons.Default.QuestionMark, 5),
     )
 
     LazyColumn(
@@ -190,11 +249,12 @@ fun ProfileBody() {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(items) { item ->
+        items(Menuitems) { item ->
             AnimatedProfileCard(
                 title = item.first,
                 icon = item.second,
-                index = item.third
+                index = item.third,
+                changeScreen = { id -> changeScreen(id)}
             )
         }
     }
@@ -204,7 +264,8 @@ fun ProfileBody() {
 fun AnimatedProfileCard(
     title: String,
     icon: ImageVector,
-    index: Int
+    index: Int,
+    changeScreen: (id:Int) -> Unit
 ) {
     val visible = remember { mutableStateOf(false) }
 
@@ -224,7 +285,7 @@ fun AnimatedProfileCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .clickable(onClick = {  } )
+                .clickable(onClick = { changeScreen(index) } )
         ) {
             Row(
                 modifier = Modifier
@@ -245,4 +306,14 @@ fun AnimatedProfileCard(
             }
         }
     }
+}
+
+enum class ProfileScreens(name :String , id:Int = -1){
+    Profile(name = "Profile"),
+    Settings(name = "Settings" , id = 0),
+    Statistics(name = "Statistics",id =1),
+    TrackedApps(name ="TrackedApp",id=2),
+    Themes(name="Theme & Preferences" , id = 3),
+    About(name="About" , id = 4),
+    Help(name="Help",id = 5 )
 }

@@ -10,6 +10,7 @@ import androidx.annotation.RequiresApi
 import com.example.compose.AppTheme
 import com.example.whyamihere.Model.UsageStatsRepository
 import com.example.whyamihere.View.AppNavi
+import com.example.whyamihere.ViewModel.MyAppViewModel
 import com.example.whyamihere.ViewModel.createChannel
 
 import com.example.whyamiherelab.HomeScreen
@@ -22,10 +23,10 @@ class MainActivity : ComponentActivity() {
             window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#121212"))
             enableEdgeToEdge()
             super.onCreate(savedInstanceState)
-            val usageRepository = UsageStatsRepository(this)
+            val myappviewmodel = MyAppViewModel(this)
             setContent {
                 AppTheme(darkTheme = true, dynamicColor = false) {
-                    AppNavi(usageRepository)
+                    AppNavi(myappviewmodel)
                 }
             }
         }

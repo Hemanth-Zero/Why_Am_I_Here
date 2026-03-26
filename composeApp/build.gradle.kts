@@ -1,3 +1,4 @@
+import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -6,6 +7,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    id("com.google.devtools.ksp") version "2.3.6"
 }
 
 kotlin {
@@ -27,11 +29,15 @@ kotlin {
     
     sourceSets {
         androidMain.dependencies {
+            val room_version = "2.6.1"
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation("androidx.compose.material:material-icons-core:1.7.8")
             implementation("androidx.compose.material:material-icons-extended:1.7.8")
             implementation("androidx.navigation:navigation-compose:2.9.7")
+            implementation("com.google.accompanist:accompanist-drawablepainter:0.34.0")
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.sqlite.bundled)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -42,6 +48,8 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -78,5 +86,6 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+    add("kspAndroid", "androidx.room:room-compiler:2.8.4")
 }
 
