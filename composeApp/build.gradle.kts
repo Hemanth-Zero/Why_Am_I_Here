@@ -36,6 +36,8 @@ kotlin {
             implementation("androidx.compose.material:material-icons-extended:1.7.8")
             implementation("androidx.navigation:navigation-compose:2.9.7")
             implementation("com.google.accompanist:accompanist-drawablepainter:0.34.0")
+            implementation("androidx.savedstate:savedstate-ktx:1.2.1")
+            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
             implementation(libs.androidx.room.runtime)
             implementation(libs.sqlite.bundled)
         }

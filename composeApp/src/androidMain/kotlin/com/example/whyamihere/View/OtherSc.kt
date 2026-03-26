@@ -1,88 +1,81 @@
 package com.example.whyamihere.View
 
-
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.modifier.modifierLocalConsumer
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.whyamihere.ViewModel.AppData
 import com.example.whyamihere.ViewModel.MyAppViewModel
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
-import kotlinx.coroutines.delay
-import kotlin.collections.emptyList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrackedAppScreen(myAppViewModel: MyAppViewModel){
-    val installedApps = remember {   myAppViewModel.getNonSystemApps() }
+fun TrackedAppScreen(myAppViewModel: MyAppViewModel, onBack: () -> Unit = {}) {
+    val installedApps = remember { myAppViewModel.getNonSystemApps() }
     var searchQuery by remember { mutableStateOf("") }
     val filteredApps = installedApps.filter {
         it.name.contains(searchQuery, ignoreCase = true)
     }
-    val EnabledApps = remember{mutableListOf<String>()}
-    Scaffold(
-        topBar = { CenterAlignedTopAppBar(
-            title = {
-                Text(text = "Your Tracked Apps" )
-            },
-            navigationIcon = {
-                Icon(imageVector = Icons.Default.ArrowBack ,
-                    contentDescription = "Back" ,
-                    modifier = Modifier.padding(4.dp))
+
+    val enabledApps = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            installedApps.forEach { put(it.packageName, it.onTrack) }
+        }
+    }
+    val dailyLimits = remember {
+        mutableStateMapOf<String, Int>().apply {
+            installedApps.forEach { app ->
+                put(app.packageName, myAppViewModel.getDailyLimitMinutes(app.packageName))
             }
-        ) } ,
-        bottomBar = {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
+        }
+    }
+    var showLimitDialog by remember { mutableStateOf<String?>(null) }
+    var limitInputText by remember { mutableStateOf("") }
 
-                    Button(
-                        onClick = { },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Apply")
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Tracked Apps") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-
                 }
+            )
+        },
+        bottomBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Button(
+                    onClick = {
+                        val tracked = enabledApps.filter { it.value }.keys.toSet()
+                        myAppViewModel.saveTrackedApps(tracked)
+                        dailyLimits.forEach { (pkg, mins) ->
+                            myAppViewModel.setDailyLimitMinutes(pkg, mins)
+                        }
+                        onBack()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Apply & Save")
+                }
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -97,50 +90,147 @@ fun TrackedAppScreen(myAppViewModel: MyAppViewModel){
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(vertical = 8.dp),
                     placeholder = { Text("Search apps") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    },
-                    singleLine = true
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
-            items(filteredApps) {  app ->
-                var enabled by remember { mutableStateOf(false) }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Image(
-                                painter = rememberDrawablePainter(app.icon),
-                                contentDescription = app.name,
-                                modifier = Modifier.size(40.dp)
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = app.name,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Switch(
-                                checked = enabled,
-                                onCheckedChange = { enabled = it }
-                            )
-                        }
-                    }
-                if(enabled){
-                    EnabledApps.add(app.packageName)
+
+            val trackedFiltered = filteredApps.filter { enabledApps[it.packageName] == true }
+            val untrackedFiltered = filteredApps.filter { enabledApps[it.packageName] != true }
+
+            if (trackedFiltered.isNotEmpty()) {
+                item {
+                    Text(
+                        "Tracked (${trackedFiltered.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                    )
                 }
-                if(!enabled && EnabledApps.contains(app.packageName)){
-                    EnabledApps.remove(app.packageName)
+                items(trackedFiltered, key = { it.packageName }) { app ->
+                    TrackedAppCard(
+                        app = app,
+                        enabled = enabledApps[app.packageName] == true,
+                        dailyLimitMinutes = dailyLimits[app.packageName] ?: 60,
+                        onToggle = { enabledApps[app.packageName] = it },
+                        onEditLimit = {
+                            limitInputText = (dailyLimits[app.packageName] ?: 60).toString()
+                            showLimitDialog = app.packageName
+                        }
+                    )
+                }
+            }
+
+            if (untrackedFiltered.isNotEmpty()) {
+                item {
+                    Text(
+                        "Other apps",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                    )
+                }
+                items(untrackedFiltered, key = { it.packageName }) { app ->
+                    TrackedAppCard(
+                        app = app,
+                        enabled = enabledApps[app.packageName] == true,
+                        dailyLimitMinutes = dailyLimits[app.packageName] ?: 60,
+                        onToggle = { enabledApps[app.packageName] = it },
+                        onEditLimit = {
+                            limitInputText = (dailyLimits[app.packageName] ?: 60).toString()
+                            showLimitDialog = app.packageName
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    showLimitDialog?.let { pkg ->
+        val appName = installedApps.find { it.packageName == pkg }?.name ?: pkg
+        AlertDialog(
+            onDismissRequest = { showLimitDialog = null },
+            title = { Text("Daily Limit") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Set a daily time limit for $appName")
+                    OutlinedTextField(
+                        value = limitInputText,
+                        onValueChange = { limitInputText = it.filter { c -> c.isDigit() } },
+                        label = { Text("Minutes per day") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val mins = limitInputText.toIntOrNull()?.coerceIn(1, 1440) ?: 60
+                    dailyLimits[pkg] = mins
+                    showLimitDialog = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLimitDialog = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+fun TrackedAppCard(
+    app: AppData,
+    enabled: Boolean,
+    dailyLimitMinutes: Int,
+    onToggle: (Boolean) -> Unit,
+    onEditLimit: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(if (enabled) 4.dp else 1.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = rememberDrawablePainter(app.icon),
+                    contentDescription = app.name,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(app.name, fontWeight = FontWeight.Medium)
+                    if (enabled) {
+                        Text(
+                            "Limit: ${dailyLimitMinutes}m/day",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Switch(checked = enabled, onCheckedChange = onToggle)
+            }
+            if (enabled) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                TextButton(
+                    onClick = onEditLimit,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(end = 8.dp, bottom = 4.dp)
+                ) {
+                    Text("Set daily limit")
                 }
             }
         }
     }
 }
-
