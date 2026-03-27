@@ -6,14 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.week2.TaskScreen
 import com.example.whyamihere.ViewModel.MyAppViewModel
 import com.example.whyamiherelab.HomeScreen
 
 @RequiresApi(Build.VERSION_CODES.Q)
 @Composable
 fun AppNavi(myAppViewModel: MyAppViewModel) {
-    val usageList = myAppViewModel.getUsageList()
+    val usageList     = myAppViewModel.getUsageList()
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = Screens.HomeScreen.name) {
@@ -35,6 +34,7 @@ fun AppNavi(myAppViewModel: MyAppViewModel) {
                 launchSingleTop = true; restoreState = true
             }
         }
+
         composable(Screens.TasksScreen.name) {
             TaskScreen(Sc3 = Sc3, Sc1 = Sc1, Sc2 = Sc2)
         }

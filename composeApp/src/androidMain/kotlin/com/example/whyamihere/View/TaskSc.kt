@@ -1,4 +1,4 @@
-package com.example.week2
+package com.example.whyamihere.View
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,11 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.whyamihere.View.AppBottomBar
-import com.example.whyamihere.View.Screens
+import com.example.whyamihere.Model.Task
+import com.example.whyamihere.Model.TaskDatabase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,47 +26,63 @@ fun TaskScreen(
     Sc2: () -> Unit,
     Sc3: () -> Unit
 ) {
+    val context = LocalContext.current
+    val db      = remember { TaskDatabase.getInstance(context) }
 
-    val checklist = remember { mutableStateListOf<String>() }
+
+    var tasks by remember { mutableStateOf(db.getAllTasks()) }
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("To Do List") }
-            )
+            CenterAlignedTopAppBar(title = { Text("To Do List") })
         },
         bottomBar = {
-            AppBottomBar(
-                Sc1,
-                Sc2 = Sc2,
-                Sc3 = Sc3,
-                selected = Screens.TasksScreen.id
-            )
+            AppBottomBar(Sc1, Sc2 = Sc2, Sc3 = Sc3, selected = Screens.TasksScreen.id)
         }
     ) { padding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
 
-            Adding(list = checklist)
+            TaskAdder { title ->
+                val newTask = db.insertTask(title)
+                tasks = tasks + newTask
+            }
 
-            Divider()
+            HorizontalDivider()
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-            ) {
-                items(checklist) { item ->
 
-                    CheckCard(
-                        name = item,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        delete = { checklist.remove(item) }
+            if (tasks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text  = "No tasks yet.\nAdd one above!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(tasks, key = { it.id }) { task ->
+                        TaskCard(
+                            task   = task,
+                            onDelete = {
+                                db.deleteTask(task.id)
+                                tasks = tasks.filter { it.id != task.id }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -73,95 +90,72 @@ fun TaskScreen(
 }
 
 @Composable
-fun Adding(list: MutableList<String>) {
-
-    var name by remember { mutableStateOf("") }
+private fun TaskAdder(onAdd: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(12.dp)
     ) {
-
         Row(
-            modifier = Modifier
-                .padding(12.dp),
+            modifier          = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.weight(1f),
-                label = { Text("New Task") },
-                singleLine = true
+                value         = text,
+                onValueChange = { text = it },
+                modifier      = Modifier.weight(1f),
+                label         = { Text("New Task") },
+                singleLine    = true
             )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
+            Spacer(Modifier.width(8.dp))
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
-                        list.add(name)
-                        name = ""
+                    if (text.isNotBlank()) {
+                        onAdd(text.trim())
+                        text = ""
                     }
                 }
-            ) {
-                Text("Add")
-            }
+            ) { Text("Add") }
         }
     }
 }
 
+
 @Composable
-fun CheckCard(
-    name: String,
-    modifier: Modifier,
-    delete: () -> Unit
-) {
+private fun TaskCard(task: Task, onDelete: () -> Unit) {
+    var checked by remember { mutableStateOf(false) }
 
-    var clicked by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
-
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .padding(14.dp)
-                .fillMaxWidth(),
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Icon(
-                imageVector =
-                    if (clicked) Icons.Filled.CheckCircle
-                    else Icons.Outlined.CheckCircle,
-
-                contentDescription = "Check",
-
-                modifier = Modifier
-                    .clickable { clicked = !clicked }
-                    .padding(end = 12.dp)
+                imageVector        = if (checked) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                contentDescription = "Toggle",
+                modifier           = Modifier
+                    .clickable { checked = !checked }
+                    .padding(end = 12.dp),
+                tint               = if (checked) MaterialTheme.colorScheme.primary
+                                     else MaterialTheme.colorScheme.onSurfaceVariant
             )
-
             Text(
-                text = name,
-                modifier = Modifier.weight(1f),
-                fontSize = 18.sp,
-                textDecoration =
-                    if (clicked)
-                        TextDecoration.LineThrough
-                    else
-                        TextDecoration.None
+                text           = task.title,
+                modifier       = Modifier.weight(1f),
+                fontSize       = 18.sp,
+                textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None
             )
-
             Icon(
-                imageVector = Icons.Outlined.Clear,
+                imageVector        = Icons.Outlined.Clear,
                 contentDescription = "Delete",
-                modifier = Modifier
-                    .clickable { delete() }
-                    .padding(start = 12.dp)
+                modifier           = Modifier
+                    .clickable { onDelete() }
+                    .padding(start = 12.dp),
+                tint               = MaterialTheme.colorScheme.error
             )
         }
     }

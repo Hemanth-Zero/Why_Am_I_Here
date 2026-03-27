@@ -5,35 +5,44 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.IBinder
+import android.util.Log
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.*
-import androidx.savedstate.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.example.compose.AppTheme
-import com.example.whyamihere.AppTimerService
-import com.example.whyamihere.Model.IntentionStore
+import com.example.whyamihere.Model.TrackedAppsPrefs
 import com.example.whyamihere.View.IntentionOverlay
-import kotlin.jvm.java
+import com.example.whyamihere.View.OverlayCallbacks
 
 class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
     override val lifecycle: Lifecycle get() = lifecycleRegistry
-    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
 
     private var windowManager: WindowManager? = null
     private var composeView: ComposeView? = null
 
     companion object {
         const val EXTRA_PACKAGE_NAME = "package_name"
-        const val EXTRA_APP_NAME = "app_name"
+        const val EXTRA_APP_NAME     = "app_name"
 
-        private var isOverlayShowing = false
+        @Volatile private var isOverlayShowing = false
 
         fun show(context: Context, packageName: String, appName: String) {
-            if (isOverlayShowing) return
-
+            if (isOverlayShowing) {
+                Log.d("OverlayService", "Overlay already showing, skipping")
+                return
+            }
             val intent = Intent(context, OverlayService::class.java).apply {
                 putExtra(EXTRA_PACKAGE_NAME, packageName)
                 putExtra(EXTRA_APP_NAME, appName)
@@ -59,14 +68,12 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val packageName = intent?.getStringExtra(EXTRA_PACKAGE_NAME) ?: return START_NOT_STICKY
-        val appName = intent.getStringExtra(EXTRA_APP_NAME) ?: packageName
-
+        val appName     = intent.getStringExtra(EXTRA_APP_NAME) ?: packageName
         showOverlay(packageName, appName)
         return START_NOT_STICKY
     }
 
     private fun showOverlay(packageName: String, appName: String) {
-
         if (composeView != null) return
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -80,61 +87,65 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
             PixelFormat.TRANSLUCENT
         )
 
+        val ctx = this
+
+        val callbacks = OverlayCallbacks(
+            // ── Button 1: Unlimited – dismiss overlay for the rest of today ──
+            onUnlimited = {
+                TrackedAppsPrefs.setUnlimited(ctx, packageName, true)
+                dismiss(ctx)
+            },
+
+            // ── Button 2: Break interval defined in Settings ─────────────────
+            onBreakInterval = {
+                val breakMins = TrackedAppsPrefs.getBreakReminderMinutes(ctx)
+                dismiss(ctx)
+                BreakTimerService.start(ctx, breakMins * 60, packageName, appName)
+            },
+
+            // ── Button 3: User-chosen custom timer (5-30 min) ────────────────
+            onCustomTimer = { minutes ->
+                dismiss(ctx)
+                BreakTimerService.start(ctx, minutes * 60, packageName, appName)
+            },
+
+            // ── Button 4: Exit – go home ──────────────────────────────────────
+            onExit = {
+                dismiss(ctx)
+                startActivity(Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_HOME)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                })
+            }
+        )
+
         composeView = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@OverlayService)
             setViewTreeSavedStateRegistryOwner(this@OverlayService)
-
             setContent {
                 AppTheme(darkTheme = true, dynamicColor = false) {
                     IntentionOverlay(
-                        appName = appName,
+                        appName     = appName,
                         packageName = packageName,
-
-                        // 🔥 FIXED LOGIC HERE
-                        onIntentionSet = { intention ->
-
-                            // ✅ Handle timed session
-                            if (intention == "timed_session") {
-                                val timerIntent = Intent(
-                                    this@OverlayService,
-                                    AppTimerService::class.java
-                                )
-                                timerIntent.putExtra("TIME", 10 * 60 * 1000L) // 10 mins
-                                startService(timerIntent)
-                            }
-
-                            IntentionStore.setIntention(
-                                this@OverlayService,
-                                packageName,
-                                intention
-                            )
-
-                            dismiss(this@OverlayService)
-                        },
-
-                        onExit = {
-                            IntentionStore.clearIntention(this@OverlayService, packageName)
-                            dismiss(this@OverlayService)
-
-                            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                                addCategory(Intent.CATEGORY_HOME)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            startActivity(homeIntent)
-                        }
+                        callbacks   = callbacks
                     )
                 }
             }
         }
 
-        windowManager?.addView(composeView, params)
-        isOverlayShowing = true
+        try {
+            windowManager?.addView(composeView, params)
+            isOverlayShowing = true
+        } catch (e: Exception) {
+            Log.e("OverlayService", "Error adding overlay: ${e.message}")
+        }
     }
 
     override fun onDestroy() {
-        composeView?.let {
-            try { windowManager?.removeView(it) } catch (_: Exception) {}
-        }
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        composeView?.let { try { windowManager?.removeView(it) } catch (_: Exception) {} }
         composeView = null
         isOverlayShowing = false
         super.onDestroy()

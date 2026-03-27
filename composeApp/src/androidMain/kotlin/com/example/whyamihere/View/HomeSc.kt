@@ -4,31 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -41,146 +22,207 @@ import com.example.whyamihere.View.AppBottomBar
 import com.example.whyamihere.View.Screens
 import kotlinx.coroutines.delay
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun HomeScreen(
+    listofapp: List<AppUsage>,
+    Sc1: () -> Unit,
+    Sc2: () -> Unit,
+    Sc3: () -> Unit
+) {
+    val sortedList = listofapp.sortedByDescending { it.timeUsed }
+    val totalTime = sortedList.sumOf { it.timeUsed }
 
-fun HomeScreen( listofapp : List<AppUsage> ,
-                Sc1:()-> Unit,Sc2: () -> Unit , Sc3: () -> Unit
-                ){
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(text = "HomeScreen") },
-            ) },
+            )
+        },
         bottomBar = {
-            AppBottomBar(Sc1, Sc2 = Sc2, Sc3 = Sc3 , selected = Screens.HomeScreen.id)
+            AppBottomBar(
+                Sc1,
+                Sc2 = Sc2,
+                Sc3 = Sc3,
+                selected = Screens.HomeScreen.id
+            )
         }
     ) { paddingValues ->
-        var sortedList = listofapp.sortedByDescending { it.timeUsed }
-        Column(modifier = Modifier.padding(paddingValues)) {
-            val screenheight = LocalConfiguration.current.screenWidthDp.dp
+
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .padding(8.dp)
+        ) {
+
+            val screenHeight = LocalConfiguration.current.screenWidthDp.dp
+
+
             Card(
-                modifier = Modifier.fillMaxWidth().padding(4.dp).height(screenheight/1.5f)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp)
+                    .height(screenHeight / 1.5f)
             ) {
-                MultColorCircularBar(
-                    sortedList
-                )
-
+                MultColorCircularBar(sortedList)
             }
-            Card(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
-                for( i in 0 until 5){
-                    AppCard(app = sortedList.get(i) , i)
+
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp)
+            ) {
+                Column(modifier = Modifier.padding(6.dp)) {
+                    sortedList.take(4).forEachIndexed { index, app ->
+                        AppCard(app = app, i = index, totalTime = totalTime)
+                    }
                 }
-
             }
-            //UsageScreen(sortedList)
         }
     }
 }
 
 @Composable
-fun AppCard(app: AppUsage , i : Int ){
+fun AppCard(app: AppUsage, i: Int, totalTime: Long) {
+
     var visible by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        delay(i*100L)
+        delay(i * 100L)
         visible = true
     }
-    AnimatedVisibility(visible = visible
-    , enter = slideInHorizontally(initialOffsetX = {it})+ fadeIn()
+
+    val (hrs, mins) = hournMin(app.timeUsed)
+    val progress =
+        if (totalTime > 0) app.timeUsed.toFloat() / totalTime else 0f
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn()
     ) {
-        Card(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row() {
-                    Canvas(modifier = Modifier.size(12.dp)) {
-                        drawCircle(
-                            color = when (i) {
-                                0 -> Color.Red
-                                1 -> Color.Yellow
-                                2 -> Color.Green
-                                3 -> Color.Magenta
-                                4 -> Color(0xFFFF9800)
-                                else -> Color.Blue
-                            },
-                            radius = size.minDimension / 2
-                        )
+            Column(modifier = Modifier.padding(12.dp)) {
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Canvas(modifier = Modifier.size(12.dp)) {
+                            drawCircle(
+                                color = when (i) {
+                                    0 -> Color.Red
+                                    1 -> Color.Yellow
+                                    2 -> Color.Green
+                                    3 -> Color.Magenta
+                                    else -> Color.Blue
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(text = app.appName)
                     }
-                    Text(text = app.appName, modifier = Modifier.padding(4.dp))
+
+                    Text(text = "${hrs}h ${mins}m")
                 }
 
-                var apptime = ""
-                if (hournMin(app.timeUsed)[0] > 0) {
-                    apptime += "" + hournMin(app.timeUsed)[0] + "hrs"
-                }
-                apptime += " " + hournMin(app.timeUsed)[1] + "mins"
-                Text(text = apptime)
+                Spacer(modifier = Modifier.height(8.dp))
+
+
+                LinearProgressIndicator(
+                    progress = progress,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                )
             }
         }
     }
 }
 
-
 @Composable
-fun MultColorCircularBar(usagedata: List<AppUsage>){
-    val totaltime = usagedata.sumOf { it.timeUsed }
-    Card(
-        Modifier.fillMaxWidth().padding(10.dp) ,
-        ) {
-        Column(verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize().padding(10.dp))
-        {
-            val screenWidth = LocalConfiguration.current.screenWidthDp.dp/2
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                var timetodisplay = "Total time \n "+ hournMin(totaltime)[0]+" hrs "+ hournMin(totaltime)[1]+" mins"
-                Text(text = timetodisplay , fontSize = 16.sp, fontWeight = FontWeight.Bold)
+fun MultColorCircularBar(usagedata: List<AppUsage>) {
 
-                var sweptangle = 0f
+    val totaltime = usagedata.sumOf { it.timeUsed }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(10.dp)
+    ) {
+
+        Column(
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp)
+        ) {
+
+            val screenWidth = LocalConfiguration.current.screenWidthDp.dp / 2
+
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+
+                val (hrs, mins) = hournMin(totaltime)
+
+                Text(
+                    text = "Total time\n${hrs} hrs ${mins} mins",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
                 Canvas(modifier = Modifier.size(screenWidth)) {
-                    var startangle = -90f
-                    for (i in 0 until 6) {
-                        var color = when (i) {
+
+                    var startAngle = -90f
+
+                    usagedata.take(5).forEachIndexed { i, app ->
+
+                        val color = when (i) {
                             0 -> Color.Red
                             1 -> Color.Yellow
                             2 -> Color.Green
                             3 -> Color.Magenta
-                            4 -> Color(0xFFFF9800)
                             else -> Color.Blue
                         }
-                        sweptangle =
-                            360f * (usagedata.get(i).timeUsed.toFloat() / totaltime.toFloat())
-                        if(i == 5){
-                            sweptangle = 270f - startangle
-                        }
 
-
+                        val sweepAngle =
+                            if (totaltime > 0)
+                                360f * (app.timeUsed.toFloat() / totaltime.toFloat())
+                            else 0f
 
                         drawArc(
                             color = color,
-                            startAngle = startangle,
-                            sweepAngle = sweptangle,
+                            startAngle = startAngle,
+                            sweepAngle = sweepAngle,
                             style = Stroke(width = 15f, cap = StrokeCap.Round),
-                            useCenter = false,
+                            useCenter = false
+                        )
 
-                            )
-                        startangle += sweptangle
+                        startAngle += sweepAngle
                     }
-
                 }
             }
         }
     }
-
 }
 
-fun hournMin(time: Long): List<Long>{
-    var hour = (time/(1000*60*60))
-    var mins = ((time/(1000*60))-hour*60)
-    return listOf(hour,mins)
+fun hournMin(time: Long): Pair<Long, Long> {
+    val hour = time / (1000 * 60 * 60)
+    val mins = (time / (1000 * 60)) - hour * 60
+    return Pair(hour, mins)
 }
 
 @Composable
