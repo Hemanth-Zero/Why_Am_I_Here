@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  AndroidManifest ADDITIONS for Why Am I Here v2.0           ║
+  ║  Add these to your existing composeApp/src/androidMain/      ║
+  ║  AndroidManifest.xml                                         ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  1. PERMISSIONS – add inside <manifest> before <application>:
+-->
+
+<!-- Already present: SYSTEM_ALERT_WINDOW, PACKAGE_USAGE_STATS -->
+<!-- ADD these if not already present: -->
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+<!--
+  2. SERVICES – add inside <application>:
+-->
+
+<!-- BreakTimerService: counts down, shows notification, re-triggers overlay -->
+<service
+    android:name=".BreakTimerService"
+    android:exported="false"
+    android:foregroundServiceType="specialUse">
+    <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="breakTimer"/>
+</service>
+
+<!--
+  3. EXISTING OverlayService: no changes needed to the manifest entry.
+     Keep the existing:
+     <service android:name=".OverlayService" android:exported="false"/>
+
+  4. ACCESSIBILITY SERVICE: keep existing AppMonitorService entry unchanged.
+     The accessibility XML config is unchanged.
+
+  FULL EXAMPLE of what your manifest application block should contain:
+
+  <application ...>
+      <activity android:name=".MainActivity" ... />
+
+      <service android:name=".OverlayService" android:exported="false"/>
+
+      <service
+          android:name=".BreakTimerService"
+          android:exported="false"
+          android:foregroundServiceType="specialUse">
+          <property
+              android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+              android:value="breakTimer"/>
+      </service>
+
+      <service
+          android:name=".AppMonitorService"
+          android:exported="true"
+          android:label="Why Am I Here Monitor"
+          android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+          <intent-filter>
+              <action android:name="android.accessibilityservice.AccessibilityService"/>
+          </intent-filter>
+          <meta-data
+              android:name="android.accessibilityservice"
+              android:resource="@xml/accessibility_service_config"/>
+      </service>
+  </application>
+-->

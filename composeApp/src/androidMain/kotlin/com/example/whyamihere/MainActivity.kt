@@ -12,6 +12,7 @@ import androidx.annotation.RequiresApi
 import com.example.compose.AppTheme
 import com.example.whyamihere.View.AppNavi
 import com.example.whyamihere.ViewModel.MyAppViewModel
+import com.example.whyamihere.ViewModel.cancelBreakTimerNotification
 import com.example.whyamihere.ViewModel.createChannel
 
 class MainActivity : ComponentActivity() {
@@ -25,11 +26,9 @@ class MainActivity : ComponentActivity() {
 
         // Request overlay permission if not granted
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             )
-            startActivity(intent)
         }
 
         val myAppViewModel = MyAppViewModel(this)
@@ -38,5 +37,12 @@ class MainActivity : ComponentActivity() {
                 AppNavi(myAppViewModel)
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cancel notification and stop break timer when app is fully closed
+        cancelBreakTimerNotification(this)
+        stopService(Intent(this, BreakTimerService::class.java))
     }
 }

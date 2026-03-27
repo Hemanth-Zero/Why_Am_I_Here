@@ -70,7 +70,7 @@ fun HelpCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            content() // ✅ THIS WAS MISSING
+            content()
         }
     }
 }

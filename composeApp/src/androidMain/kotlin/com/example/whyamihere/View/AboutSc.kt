@@ -34,7 +34,7 @@ fun AboutScreen() {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
 
-            // App Title
+
             Text(
                 text = "Why Am I Here?",
                 style = MaterialTheme.typography.headlineMedium,
@@ -46,7 +46,7 @@ fun AboutScreen() {
                 style = MaterialTheme.typography.bodyMedium
             )
 
-            // About Card
+
             Card(
                 shape = MaterialTheme.shapes.large
             ) {
@@ -67,7 +67,7 @@ fun AboutScreen() {
                 }
             }
 
-            // Features Card
+
             Card(
                 shape = MaterialTheme.shapes.large
             ) {
@@ -90,7 +90,7 @@ fun AboutScreen() {
                 }
             }
 
-            // Mission Card
+
             Card(
                 shape = MaterialTheme.shapes.large
             ) {
@@ -111,7 +111,7 @@ fun AboutScreen() {
                 }
             }
 
-            // Developer Card
+
             Card(
                 shape = MaterialTheme.shapes.large
             ) {

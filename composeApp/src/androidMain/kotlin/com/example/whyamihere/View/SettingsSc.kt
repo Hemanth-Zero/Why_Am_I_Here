@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,8 +20,8 @@ fun SettingsScreen(
     myAppViewModel: MyAppViewModel,
     onBack: () -> Unit
 ) {
-    var breakMins by remember { mutableIntStateOf(myAppViewModel.getBreakReminderMinutes()) }
-    var showBreakDialog by remember { mutableStateOf(false) }
+    var breakMins      by remember { mutableIntStateOf(myAppViewModel.getBreakReminderMinutes()) }
+    var showDialog     by remember { mutableStateOf(false) }
     var breakInputText by remember { mutableStateOf(breakMins.toString()) }
 
     Scaffold(
@@ -30,14 +30,14 @@ fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier
+            modifier            = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .padding(16.dp),
@@ -46,19 +46,17 @@ fun SettingsScreen(
             item {
                 Text(
                     "Reminders",
-                    style = MaterialTheme.typography.titleMedium,
+                    style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
             }
 
+            // Break interval card
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                     Row(
-                        modifier = Modifier
+                        modifier          = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -66,45 +64,41 @@ fun SettingsScreen(
                         Icon(
                             Icons.Default.Timer,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint               = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Break reminder interval",
-                                style = MaterialTheme.typography.bodyLarge,
+                                "Break interval",
+                                style      = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                "Remind me every $breakMins minutes",
+                                // This value is what button 2 of the overlay uses
+                                "Overlay button 2 will set a $breakMins-min break",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        TextButton(onClick = { showBreakDialog = true }) {
-                            Text("Edit")
-                        }
+                        TextButton(onClick = { showDialog = true }) { Text("Edit") }
                     }
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     "About",
-                    style = MaterialTheme.typography.titleMedium,
+                    style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(Modifier.height(4.dp))
             }
 
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                     Column(
-                        modifier = Modifier
+                        modifier            = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -112,14 +106,14 @@ fun SettingsScreen(
                         Text("Why Am I Here?", fontWeight = FontWeight.Bold)
                         Text(
                             "An app that helps you be mindful of your digital habits. " +
-                            "It prompts your intention before opening tracked apps and " +
-                            "reminds you to take breaks.",
+                            "The overlay appears only when today's (IST 00:00–24:00) usage " +
+                            "exceeds your set daily limit.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(Modifier.height(4.dp))
                         Text(
-                            "Version 1.0",
+                            "Version 2.0",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -128,31 +122,32 @@ fun SettingsScreen(
             }
         }
 
-        if (showBreakDialog) {
+        //  Edit break interval dialog
+        if (showDialog) {
             AlertDialog(
-                onDismissRequest = { showBreakDialog = false },
-                title = { Text("Break Reminder Interval") },
-                text = {
+                onDismissRequest = { showDialog = false },
+                title            = { Text("Break Interval") },
+                text             = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("How often should we remind you to take a break?")
+                        Text("How many minutes should button 2 on the overlay use?")
                         OutlinedTextField(
-                            value = breakInputText,
-                            onValueChange = { breakInputText = it.filter { c -> c.isDigit() } },
-                            label = { Text("Minutes") },
-                            singleLine = true
+                            value         = breakInputText,
+                            onValueChange = { breakInputText = it.filter(Char::isDigit) },
+                            label         = { Text("Minutes") },
+                            singleLine    = true
                         )
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = {
-                        val mins = breakInputText.toIntOrNull()?.coerceIn(5, 120) ?: 30
+                        val mins = breakInputText.toIntOrNull()?.coerceIn(1, 120) ?: 30
                         breakMins = mins
                         myAppViewModel.setBreakReminderMinutes(mins)
-                        showBreakDialog = false
+                        showDialog = false
                     }) { Text("Save") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showBreakDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { showDialog = false }) { Text("Cancel") }
                 }
             )
         }

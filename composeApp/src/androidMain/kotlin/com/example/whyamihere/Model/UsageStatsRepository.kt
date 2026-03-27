@@ -6,92 +6,100 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.annotation.RequiresApi
-import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Calendar
+import java.util.TimeZone
 
 class UsageStatsRepository(private val context: Context) {
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun getTodayUsage(): List<AppUsage> {
-        val startTime = LocalDate.now()
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-        return getUsageForRange(startTime, System.currentTimeMillis())
-    }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun getWeeklyUsage(): Map<String, Long> {
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.DAY_OF_YEAR, -6)
+    fun istMidnightOf(dayOffset: Int = 0): Long {
+        val ist = TimeZone.getTimeZone("Asia/Kolkata")
+        val cal = Calendar.getInstance(ist)
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
-        val startTime = cal.timeInMillis
-        val list = getUsageForRange(startTime, System.currentTimeMillis())
+        cal.add(Calendar.DAY_OF_YEAR, dayOffset)
+        return cal.timeInMillis
+    }
+
+
+    fun istEndOf(dayOffset: Int = 0): Long = istMidnightOf(dayOffset) + 24 * 60 * 60 * 1000L - 1
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun getTodayUsage(): List<AppUsage> {
+        val start = istMidnightOf(0)
+        val end   = System.currentTimeMillis().coerceAtMost(istEndOf(0))
+        return getUsageForRange(start, end)
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun getUsageForDay(dayOffset: Int): List<AppUsage> {
+        val start = istMidnightOf(dayOffset)
+        val end   = istEndOf(dayOffset).coerceAtMost(System.currentTimeMillis())
+        if (end <= start) return emptyList()
+        return getUsageForRange(start, end)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun getWeeklyUsage(): Map<String, Long> {
+        val list = getUsageForRange(istMidnightOf(-6), System.currentTimeMillis())
         return list.associate { it.appName to it.timeUsed }
+    }
+
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun getTodayUsageForPackage(packageName: String): Long {
+        return getTodayUsage().firstOrNull { it.packageName == packageName }?.timeUsed ?: 0L
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun getUsageForRange(startTime: Long, endTime: Long): List<AppUsage> {
-        val usageStatsManager =
-            context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val events = usm.queryEvents(startTime, endTime)
+        val foregroundStart = mutableMapOf<String, Long>()
+        val totalTime       = mutableMapOf<String, Long>()
+        val event           = UsageEvents.Event()
+        val launchers       = getLauncherPackages(context)
 
-        val usageEvents = usageStatsManager.queryEvents(startTime, endTime)
-        val foregroundStartTimes = mutableMapOf<String, Long>()
-        val totalTimeMap = mutableMapOf<String, Long>()
-        val event = UsageEvents.Event()
-
-        val launchers = getLauncherPackages(context)
-
-        while (usageEvents.hasNextEvent()) {
-            usageEvents.getNextEvent(event)
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
             if (event.packageName in launchers) continue
-
-            val pkg = event.packageName
-            val activityKey = "$pkg/${event.className ?: ""}"
-            val ts = event.timeStamp
-
+            val key = "${event.packageName}/${event.className ?: ""}"
+            val ts  = event.timeStamp
             when (event.eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED -> {
-                    if (!foregroundStartTimes.containsKey(activityKey)) {
-                        foregroundStartTimes[activityKey] = ts
-                    }
+                    if (!foregroundStart.containsKey(key)) foregroundStart[key] = ts
                 }
                 UsageEvents.Event.ACTIVITY_PAUSED,
                 UsageEvents.Event.ACTIVITY_STOPPED -> {
-                    val sessionStart = foregroundStartTimes.remove(activityKey)
-                    if (sessionStart != null) {
-                        val duration = ts - sessionStart
-                        if (duration in 1..(1000 * 60 * 60 * 24)) {
-                            totalTimeMap[pkg] = (totalTimeMap[pkg] ?: 0L) + duration
+                    val s = foregroundStart.remove(key)
+                    if (s != null) {
+                        val dur = ts - s
+                        if (dur in 1..(86_400_000L)) {
+                            val pkg = key.substringBefore("/")
+                            totalTime[pkg] = (totalTime[pkg] ?: 0L) + dur
                         }
                     }
                 }
             }
         }
-
-        foregroundStartTimes.forEach { (activityKey, sessionStart) ->
-            val pkg = activityKey.substringBefore("/")
-            val duration = endTime - sessionStart
-            if (duration in 1..(1000 * 60 * 60 * 24)) {
-                totalTimeMap[pkg] = (totalTimeMap[pkg] ?: 0L) + duration
-            }
+        // still-running sessions
+        foregroundStart.forEach { (key, s) ->
+            val pkg = key.substringBefore("/")
+            val dur = endTime - s
+            if (dur in 1..(86_400_000L))
+                totalTime[pkg] = (totalTime[pkg] ?: 0L) + dur
         }
 
         val pm = context.packageManager
-        return totalTimeMap.mapNotNull { (packageName, timeUsed) ->
-            if (timeUsed <= 0) return@mapNotNull null
+        return totalTime.mapNotNull { (pkg, time) ->
+            if (time <= 0) return@mapNotNull null
             try {
-                val appInfo = pm.getApplicationInfo(packageName, 0)
-                AppUsage(
-                    appName = pm.getApplicationLabel(appInfo).toString(),
-                    packageName = packageName,
-                    timeUsed = timeUsed
-                )
-            } catch (e: Exception) { null }
+                val info = pm.getApplicationInfo(pkg, 0)
+                AppUsage(pm.getApplicationLabel(info).toString(), pkg, time)
+            } catch (_: Exception) { null }
         }.sortedByDescending { it.timeUsed }
     }
 
