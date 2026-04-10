@@ -17,9 +17,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.whyamihere.Model.AppUsage
@@ -40,11 +43,10 @@ fun StatisticsScreen(
     myAppViewModel: MyAppViewModel,
     onBack: () -> Unit
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var dayOffset   by remember { mutableIntStateOf(0) }
+    val repo        = remember { UsageStatsRepository(myAppViewModel.getContext()) }
 
-    var dayOffset by remember { mutableIntStateOf(0) }
-    val repo = remember { UsageStatsRepository(myAppViewModel.getContext()) }
-
-    // Recompute whenever dayOffset changes
     val dailyList = remember(dayOffset) { repo.getUsageForDay(dayOffset) }
 
     val dateLabel = remember(dayOffset) {
@@ -52,8 +54,8 @@ fun StatisticsScreen(
         val cal = Calendar.getInstance(ist)
         cal.add(Calendar.DAY_OF_YEAR, dayOffset)
         when (dayOffset) {
-            0    -> "Today"
-            -1   -> "Yesterday"
+            0  -> "Today"
+            -1 -> "Yesterday"
             else -> SimpleDateFormat("EEE, dd MMM", Locale.getDefault()).apply {
                 timeZone = ist
             }.format(cal.time)
@@ -77,23 +79,43 @@ fun StatisticsScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
+            // ── Tab Row ────────────────────────────────────────────────────────
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick  = { selectedTab = 0 },
+                    text     = { Text("Daily") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick  = { selectedTab = 1 },
+                    text     = { Text("Weekly") }
+                )
+            }
 
-            DayNavigationBar(
-                label      = dateLabel,
-                canGoBack  = dayOffset > -6,
-                canGoForward = dayOffset < 0,
-                onPrev     = { dayOffset-- },
-                onNext     = { dayOffset++ }
-            )
-
-            HorizontalDivider()
-
-
-            DailyStatsContent(usageList = dailyList)
+            when (selectedTab) {
+                0 -> {
+                    // ── Daily ──────────────────────────────────────────────────
+                    DayNavigationBar(
+                        label        = dateLabel,
+                        canGoBack    = dayOffset > -6,
+                        canGoForward = dayOffset < 0,
+                        onPrev       = { dayOffset-- },
+                        onNext       = { dayOffset++ }
+                    )
+                    HorizontalDivider()
+                    DailyStatsContent(usageList = dailyList)
+                }
+                1 -> {
+                    // ── Weekly ─────────────────────────────────────────────────
+                    WeeklyStatsContent(repo = repo)
+                }
+            }
         }
     }
 }
 
+// ── Day navigation bar ────────────────────────────────────────────────────────
 
 @Composable
 private fun DayNavigationBar(
@@ -118,13 +140,11 @@ private fun DayNavigationBar(
                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
             )
         }
-
         Text(
             text       = label,
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-
         IconButton(onClick = onNext, enabled = canGoForward) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -136,6 +156,8 @@ private fun DayNavigationBar(
     }
 }
 
+// ── Daily stats ───────────────────────────────────────────────────────────────
+
 @Composable
 fun DailyStatsContent(usageList: List<AppUsage>) {
     val sorted  = usageList.sortedByDescending { it.timeUsed }.take(8)
@@ -143,43 +165,223 @@ fun DailyStatsContent(usageList: List<AppUsage>) {
     val total   = sorted.sumOf { it.timeUsed }
 
     if (sorted.isEmpty()) {
-        Box(
-            modifier            = Modifier.fillMaxSize(),
-            contentAlignment    = Alignment.Center
-        ) {
-            Text(
-                text  = "No usage data for this day",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No usage data for this day", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
 
     LazyColumn(
-        modifier            = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier            = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
             SummaryCard(totalTime = total, label = "Total screen time")
             Spacer(Modifier.height(8.dp))
+            Text("Top apps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        }
+        itemsIndexed(sorted) { index, app ->
+            UsageBarCard(app = app, maxTime = maxTime, color = barColors[index % barColors.size], index = index)
+        }
+    }
+}
+
+// ── Weekly stats ──────────────────────────────────────────────────────────────
+
+@RequiresApi(Build.VERSION_CODES.Q)
+@Composable
+fun WeeklyStatsContent(repo: UsageStatsRepository) {
+    // Build last-7-days data: index 0 = 6 days ago … index 6 = today
+    val ist = TimeZone.getTimeZone("Asia/Kolkata")
+    val dayFmt = SimpleDateFormat("EEE", Locale.getDefault()).apply { timeZone = ist }
+
+    data class DayData(val label: String, val totalMs: Long)
+
+    val weekData: List<DayData> = remember {
+        (6 downTo 0).map { daysAgo ->
+            val cal = Calendar.getInstance(ist).apply { add(Calendar.DAY_OF_YEAR, -daysAgo) }
+            val label = dayFmt.format(cal.time)
+            val usage = repo.getUsageForDay(-daysAgo)
+            DayData(label, usage.sumOf { it.timeUsed })
+        }
+    }
+
+    val weekTotal  = weekData.sumOf { it.totalMs }
+    val maxDayMs   = weekData.maxOfOrNull { it.totalMs } ?: 1L
+
+    var animated by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { animated = true }
+
+    LazyColumn(
+        modifier            = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            SummaryCard(totalTime = weekTotal, label = "Total this week")
+        }
+
+        item {
             Text(
-                "Top apps",
+                "Daily breakdown",
                 style      = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
         }
-        itemsIndexed(sorted) { index, app ->
-            UsageBarCard(
-                app     = app,
-                maxTime = maxTime,
-                color   = barColors[index % barColors.size],
-                index   = index
+
+        // Bar chart card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Bar chart
+                    Row(
+                        modifier              = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        verticalAlignment     = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        weekData.forEachIndexed { index, day ->
+                            val targetFraction = if (maxDayMs > 0) day.totalMs.toFloat() / maxDayMs else 0f
+                            val animatedFraction by animateFloatAsState(
+                                targetValue   = if (animated) targetFraction else 0f,
+                                animationSpec = tween(600, delayMillis = index * 80),
+                                label         = "weekBar$index"
+                            )
+                            WeeklyBarColumn(
+                                fraction = animatedFraction,
+                                label    = day.label,
+                                color    = barColors[index % barColors.size],
+                                isToday  = index == 6,
+                                totalMs  = day.totalMs
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Per-day breakdown rows
+        item {
+            Text(
+                "Per day details",
+                style      = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        itemsIndexed(weekData.reversed()) { index, day ->
+            WeekDayRow(day.label, day.totalMs, barColors[index % barColors.size])
+        }
+    }
+}
+
+@Composable
+private fun WeeklyBarColumn(
+    fraction : Float,
+    label    : String,
+    color    : Color,
+    isToday  : Boolean,
+    totalMs  : Long
+) {
+    val hrs  = totalMs / (1000 * 60 * 60)
+    val mins = (totalMs / (1000 * 60)) % 60
+
+    Column(
+        modifier            = Modifier.width(36.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom
+    ) {
+        // Time label above bar
+        if (totalMs > 0) {
+            Text(
+                text      = if (hrs > 0) "${hrs}h" else "${mins}m",
+                fontSize  = 9.sp,
+                color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(2.dp))
+        }
+
+        // Bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            val barColor = if (isToday) color else color.copy(alpha = 0.6f)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val barHeight = size.height * fraction
+                drawRoundRect(
+                    color        = barColor,
+                    topLeft      = Offset(0f, size.height - barHeight),
+                    size         = Size(size.width, barHeight),
+                    cornerRadius = CornerRadius(6.dp.toPx())
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Text(
+            text      = label,
+            fontSize  = 10.sp,
+            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+            color      = if (isToday) MaterialTheme.colorScheme.primary
+                         else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign  = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun WeekDayRow(label: String, totalMs: Long, color: Color) {
+    val hrs    = totalMs / (1000 * 60 * 60)
+    val mins   = (totalMs / (1000 * 60)) % 60
+    val timeStr = when {
+        totalMs == 0L -> "No usage"
+        hrs > 0       -> "${hrs}h ${mins}m"
+        else          -> "${mins}m"
+    }
+
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier          = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .let {
+                        it.then(
+                            Modifier.padding(end = 0.dp)
+                        )
+                    }
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(color = color)
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text      = label,
+                modifier  = Modifier.weight(1f),
+                style     = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text  = timeStr,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
+
+// ── Shared composables ────────────────────────────────────────────────────────
 
 @Composable
 fun SummaryCard(totalTime: Long, label: String) {
@@ -192,10 +394,8 @@ fun SummaryCard(totalTime: Long, label: String) {
         colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment   = Alignment.CenterHorizontally
+            modifier            = Modifier.fillMaxWidth().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text       = "${hrs}h ${mins}m",
@@ -218,13 +418,13 @@ fun UsageBarCard(app: AppUsage, maxTime: Long, color: Color, index: Int) {
     LaunchedEffect(Unit) { kotlinx.coroutines.delay(index * 80L); animTrigger = true }
 
     val animatedProgress by animateFloatAsState(
-        targetValue  = if (animTrigger) app.timeUsed.toFloat() / maxTime.toFloat() else 0f,
+        targetValue   = if (animTrigger) app.timeUsed.toFloat() / maxTime.toFloat() else 0f,
         animationSpec = tween(600),
-        label        = "bar"
+        label         = "bar"
     )
 
-    val hrs    = app.timeUsed / (1000 * 60 * 60)
-    val mins   = (app.timeUsed / (1000 * 60)) - hrs * 60
+    val hrs     = app.timeUsed / (1000 * 60 * 60)
+    val mins    = (app.timeUsed / (1000 * 60)) - hrs * 60
     val timeStr = if (hrs > 0) "${hrs}h ${mins}m" else "${mins}m"
 
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
@@ -252,12 +452,12 @@ fun UsageBarCard(app: AppUsage, maxTime: Long, color: Color, index: Int) {
                     drawRoundRect(
                         color        = Color.White.copy(alpha = 0.08f),
                         size         = size,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                        cornerRadius = CornerRadius(4.dp.toPx())
                     )
                     drawRoundRect(
                         color        = color,
                         size         = Size(size.width * animatedProgress, size.height),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx())
+                        cornerRadius = CornerRadius(4.dp.toPx())
                     )
                 }
             }

@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.getValue
 import com.example.compose.AppTheme
 import com.example.whyamihere.View.AppNavi
 import com.example.whyamihere.ViewModel.MyAppViewModel
@@ -24,7 +26,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Request overlay permission if not granted
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             startActivity(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
@@ -33,7 +34,18 @@ class MainActivity : ComponentActivity() {
 
         val myAppViewModel = MyAppViewModel(this)
         setContent {
-            AppTheme(darkTheme = true, dynamicColor = false) {
+            // Reactively read theme state so recomposition occurs when user changes it
+            val themeMode    by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { myAppViewModel.themeMode } }
+            val dynamicColor by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { myAppViewModel.dynamicColor } }
+            val systemDark   = isSystemInDarkTheme()
+
+            val isDark = when (myAppViewModel.themeMode) {
+                "light"  -> false
+                "dark"   -> true
+                else     -> systemDark
+            }
+
+            AppTheme(darkTheme = isDark, dynamicColor = myAppViewModel.dynamicColor) {
                 AppNavi(myAppViewModel)
             }
         }
@@ -41,7 +53,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Cancel notification and stop break timer when app is fully closed
         cancelBreakTimerNotification(this)
         stopService(Intent(this, BreakTimerService::class.java))
     }

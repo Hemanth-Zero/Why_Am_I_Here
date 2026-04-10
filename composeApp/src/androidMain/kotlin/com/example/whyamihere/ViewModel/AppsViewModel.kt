@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.whyamihere.Model.AppUsage
 import com.example.whyamihere.Model.TrackedAppsPrefs
@@ -15,7 +18,6 @@ class MyAppViewModel(private val context: Context) : ViewModel() {
 
     private val usageRepository = UsageStatsRepository(context)
 
-    /* Expose context so screens can create their own repo instances */
     fun getContext(): Context = context
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -51,6 +53,48 @@ class MyAppViewModel(private val context: Context) : ViewModel() {
         TrackedAppsPrefs.getDailyLimitMinutes(context, packageName)
     fun setDailyLimitMinutes(packageName: String, minutes: Int) =
         TrackedAppsPrefs.setDailyLimitMinutes(context, packageName, minutes)
+
+    // ── Profile ───────────────────────────────────────────────────────────────
+
+    var profileName     by mutableStateOf(TrackedAppsPrefs.getProfileName(context))
+    var profileEmail    by mutableStateOf(TrackedAppsPrefs.getProfileEmail(context))
+    var profileAge      by mutableStateOf(TrackedAppsPrefs.getProfileAge(context))
+    var profileLocation by mutableStateOf(TrackedAppsPrefs.getProfileLocation(context))
+    var profilePhone    by mutableStateOf(TrackedAppsPrefs.getProfilePhone(context))
+
+    fun saveProfile(name: String, email: String, age: Int, location: String, phone: String) {
+        profileName     = name;     TrackedAppsPrefs.setProfileName(context, name)
+        profileEmail    = email;    TrackedAppsPrefs.setProfileEmail(context, email)
+        profileAge      = age;      TrackedAppsPrefs.setProfileAge(context, age)
+        profileLocation = location; TrackedAppsPrefs.setProfileLocation(context, location)
+        profilePhone    = phone;    TrackedAppsPrefs.setProfilePhone(context, phone)
+    }
+
+    // ── Theme ─────────────────────────────────────────────────────────────────
+
+    private var _themeMode    by mutableStateOf(TrackedAppsPrefs.getThemeMode(context))
+    val themeMode: String get() = _themeMode
+
+    private var _dynamicColor by mutableStateOf(TrackedAppsPrefs.getDynamicColor(context))
+    val dynamicColor: Boolean get() = _dynamicColor
+
+    private var _fontScale    by mutableStateOf(TrackedAppsPrefs.getFontScale(context))
+    val fontScale: Float get() = _fontScale
+
+    fun setThemeMode(mode: String) {
+        _themeMode = mode
+        TrackedAppsPrefs.setThemeMode(context, mode)
+    }
+
+    fun setDynamicColor(value: Boolean) {
+        _dynamicColor = value
+        TrackedAppsPrefs.setDynamicColor(context, value)
+    }
+
+    fun setFontScale(scale: Float) {
+        _fontScale = scale
+        TrackedAppsPrefs.setFontScale(context, scale)
+    }
 }
 
 data class AppData(
